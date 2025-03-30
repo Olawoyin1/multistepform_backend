@@ -1,9 +1,12 @@
 from django.db import models
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
+import random
+from django.utils import timezone
+from datetime import timedelta
 
 # Create your models here.
-class BaseUserManger(BaseUserManager):
+class CustomUser(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Please provide an Email Address")
@@ -45,8 +48,27 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
-    objects = BaseUserManager()
+    objects = CustomUser()
 
     def __str__(self):
         return self.email
     
+    
+    
+    
+class OTPVerification(models.Model):
+    email = models.EmailField()
+    first_name = models.CharField(max_length=50)
+    otp_code = models.CharField(max_length=6)
+    last_name = models.CharField(max_length=50)
+    phonenumber = models.CharField(max_length=15)
+    dob = models.DateField()
+    gender = models.CharField(max_length=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False) 
+    
+    def generate_OTP(self):
+        return str(random.randint(100000, 999999))
+
+    def is_expired(self):
+        return timezone.now > self.created_at + timedelta(minutes=10)
