@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .serializers import SendOTPSerializer, VerifyOTPSerializer
+from .serializers import SendOTPSerializer, VerifyOTPSerializer, AccountSerializer, PasswordSerializer
 from .models import OTPVerification, User
 from django.utils import timezone
 from decouple import config
@@ -205,3 +205,35 @@ class ResendOTPView(APIView):
 
         return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+
+
+class RegisterUserView(APIView):
+    def get(self,rquest):
+        user = User.objects.all()
+        serializer = AccountSerializer(data=user, many=True)
+        if serializer.is_valid():
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self, request):
+        user_data = request.data
+        serializer = PasswordSerializer(data=user_data)
+        if serializer.is_valid():
+            try:
+                email = serializer.validated_data['email']
+                password = serializer.validated_data['password']
+
+                if not User.objects.filter(email=email,is_email_verified=True).exists():
+                    return Response({"error" : "Email not registered or not verified."}, status=status.HTTP_400_BAD_REQUEST)
+                
+                
+                user_instance = User.objects.get(email=email)
+                user_instance.set_password(password)
+                
+                user_instance.save()
+                return user_instance
+            except Exception as e:
+                pass
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
