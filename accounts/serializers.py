@@ -6,3 +6,10 @@ class SendOTPSerializer(serializers.ModelSerializer):
     class Meta:
         model= OTPVerification
         fields = ['email', 'first_name', 'last_name', 'phonenumber', 'dob', 'gender']
+
+
+
+class VerifyOTPSerializer(serializers.ModelSerializer):
+    class Meta:
+        model= OTPVerification
+        fields = ['email', 'otp_code',]
