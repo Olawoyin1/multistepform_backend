@@ -144,5 +144,64 @@ class VerifyOTPView(APIView):
             except Exception as e:
                 print(f"error message - {e}")
                 return Response({"error": "Something went wrong!"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
+
         return Response(data=serializer.error, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+# ✅ Step 3: Resend OTP
+class ResendOTPView(APIView):
+    def post(self,request, *args, **kwargs):
+        user_data = request.data
+        serializer = SendOTPSerializer(data=user_data)
+        
+        if serializer.is_valid():
+            try:
+                user = serializer.validated_data
+                generated_otp_code = OTPVerification.generate_OTP()
+                
+                OTPVerification.objects.create(
+                    email=user['email'],
+                    otp_code=generated_otp_code,
+                    first_name=user['first_name'],
+                    last_name=user['last_name'],
+                    phonenumber=user['phonenumber'],
+                    dob=user['dob'],
+                    gender=user['gender'],
+                    created_at=timezone.now()
+                )
+                
+                
+                # Resend OTP email
+                subject = "Your New OTP Verification Code"
+                body = f"""
+                Dear {user['first_name']},
+                
+                You requested a new OTP to verify your email on Study Lab. Here’s your new code:
+
+                Your new OTP is: {generated_otp_code}
+                
+                This code is valid for 10 minutes. If you didn’t request this, please ignore this email.
+
+                For assistance, feel free to reach out to our support team.
+
+                Happy Learning! 📚
+                The Study Lab Team
+                """
+
+                response = send_otp_email(user['email'], subject, body)
+                
+                if response and response.status_code == 201 :
+                    return Response({"message": "OTP Sent Successfully"}, status=status.HTTP_200_OK)
+                else:
+                    return Response({"error": "Failed to send OTP email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                
+                
+            except Exception as e:
+                print(f"error message - {e}")
+                return Response({"error": "Something went wrong!"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
