@@ -7,6 +7,9 @@ from .models import OTPVerification, User
 from django.utils import timezone
 from decouple import config
 import requests
+from django.shortcuts import get_object_or_404
+
+
 
 # Create your views here.
 
@@ -52,7 +55,7 @@ def send_otp_email(to_email, subject, body):
 
 
 
-class SendOTP(APIView):
+class SendOTPView(APIView):
     def post(self,request, *args, **kwargs):
         user_data = request.data
         serializer = SendOTPSerializer(data=user_data)
@@ -237,3 +240,24 @@ class RegisterUserView(APIView):
             except Exception as e:
                 pass
         return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+
+
+class AllUsersActions(APIView):
+    def get(self, request, pk):
+        user = get_object_or_404(User, id=pk)
+        serializer = AccountSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        user = get_object_or_404(User, id=pk)
+        serializer = AccountSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "User updated successfully", "data": serializer.data}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        user = get_object_or_404(User, id=pk)
+        user.delete()
+        return Response({"message": "User deleted successfully"}, status=status.HTTP_200_OK)
