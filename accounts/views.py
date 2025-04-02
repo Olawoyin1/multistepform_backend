@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
-from .serializers import SendOTPSerializer, VerifyOTPSerializer, AccountSerializer, PasswordSerializer
+from .serializers import SendOTPSerializer, VerifyOTPSerializer, AccountSerializer, PasswordSetupSerializer
 from .models import OTPVerification, User
 from django.utils import timezone
 from decouple import config
@@ -65,6 +65,10 @@ class SendOTPView(APIView):
                 user = serializer.validated_data
                 generated_otp_code = OTPVerification.generate_OTP()
                 
+                user_exists = User.objects.filter(email=user['email']).exists()
+                if user_exists:
+                    return Response({"message": "User with Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
+                
                 OTPVerification.objects.create(
                     email=user['email'],
                     otp_code=generated_otp_code,
@@ -123,10 +127,12 @@ class VerifyOTPView(APIView):
                 otp_entry = OTPVerification.objects.filter(otp_code=otp_code, email=email).first()
                 
                 if not otp_entry:
+                    print("invalid code")
                     return Response({"error": "Invalid OTP. Please try again."}, status=status.HTTP_400_BAD_REQUEST)
 
                 # ✅ Check if OTP has expired
                 if otp_entry.is_expired():
+                    print("code Expired")
                     return Response({"error": "OTP has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
                 
                 user, created = User.objects.get_or_create(email=email)
@@ -136,8 +142,8 @@ class VerifyOTPView(APIView):
                     user.phonenumber = otp_entry.phonenumber
                     user.dob = otp_entry.dob
                     user.gender = otp_entry.gender
-                    user.is_email_verified = True
-                    user.save()
+                user.is_email_verified = True
+                user.save()
                     
                 # ✅ Delete OTP after successful verification
                 otp_entry.delete()
@@ -145,10 +151,12 @@ class VerifyOTPView(APIView):
                 return Response({"message": "OTP verified successfully!"}, status=status.HTTP_200_OK)
                 
             except Exception as e:
-                print(f"error message - {e}")
-                return Response({"error": "Something went wrong!"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response(data=serializer.error, status=status.HTTP_400_BAD_REQUEST)
+                import traceback
+                print("❌ ERROR: ", str(e))
+                print(traceback.format_exc())
+                return Response({"errors": "Something went wrong!"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print("serializer is not valid ")
+        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -213,33 +221,24 @@ class ResendOTPView(APIView):
 
 
 class RegisterUserView(APIView):
-    def get(self,rquest):
+    def get(self, request):
         user = User.objects.all()
-        serializer = AccountSerializer(data=user, many=True)
-        if serializer.is_valid():
-            return Response(data=serializer.data, status=status.HTTP_200_OK)
-        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = AccountSerializer(user, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
     
     def post(self, request):
-        user_data = request.data
-        serializer = PasswordSerializer(data=user_data)
+        serializer = PasswordSetupSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                email = serializer.validated_data['email']
-                password = serializer.validated_data['password']
+                # Call the update_password method from serializer
+                serializer.update_password()
+                return Response({"message": "Account Created successfully."}, status=status.HTTP_200_OK)
 
-                if not User.objects.filter(email=email,is_email_verified=True).exists():
-                    return Response({"error" : "Email not registered or not verified."}, status=status.HTTP_400_BAD_REQUEST)
-                
-                
-                user_instance = User.objects.get(email=email)
-                user_instance.set_password(password)
-                
-                user_instance.save()
-                return user_instance
             except Exception as e:
-                pass
-        return Response(data=serializer.errors, status=status.HTTP_400_BAD_REQUEST) 
+                print(f"❌ ERROR: {e}")
+                return Response({"error": "Something went wrong!"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AllUsersActions(APIView):

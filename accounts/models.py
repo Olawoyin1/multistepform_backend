@@ -67,8 +67,10 @@ class OTPVerification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False) 
     
-    def generate_OTP(self):
+    
+    @staticmethod
+    def generate_OTP():
         return str(random.randint(100000, 999999))
 
     def is_expired(self):
-        return timezone.now > self.created_at + timedelta(minutes=10)
+        return timezone.now() > self.created_at + timedelta(minutes=10)
